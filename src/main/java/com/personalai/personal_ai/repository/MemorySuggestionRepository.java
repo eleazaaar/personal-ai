@@ -18,6 +18,20 @@ public class MemorySuggestionRepository {
 
     public MemorySuggestionRepository(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS memory_suggestions (
+                    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                    memory_text TEXT NOT NULL,
+                    memory_type ENUM('fact','preference','episodic','inference','other') NOT NULL DEFAULT 'fact',
+                    source_conversation_id VARCHAR(100) DEFAULT NULL,
+                    source_message TEXT DEFAULT NULL,
+                    status ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    reviewed_at TIMESTAMP NULL DEFAULT NULL,
+                    PRIMARY KEY (id),
+                    KEY idx_memory_status (status, created_at)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                """);
     }
 
     public List<MemorySuggestion> findPending() {

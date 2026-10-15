@@ -188,6 +188,24 @@ public class HomeController {
                             white-space: pre-wrap;
                         }
 
+                        .bubble h3 {
+                            margin: 14px 0 6px;
+                            color: #d9d2ff;
+                            font-size: 14px;
+                        }
+
+                        .bubble h3:first-child { margin-top: 0; }
+
+                        .bubble p { margin: 0 0 8px; }
+                        .bubble p:last-child { margin-bottom: 0; }
+
+                        .bubble ul, .bubble ol {
+                            margin: 4px 0 10px;
+                            padding-left: 21px;
+                        }
+
+                        .bubble a { color: #c3b8ff; }
+
                         .user .bubble {
                             border-color: transparent;
                             background: var(--user);
@@ -317,6 +335,39 @@ public class HomeController {
                             font-size: 12px;
                         }
 
+                        .resume-upload {
+                            display: none;
+                            max-width: 760px;
+                            margin: 0 auto 10px;
+                        }
+
+                        .resume-upload.visible { display: flex; }
+
+                        .code-upload {
+                            display: none;
+                            max-width: 760px;
+                            margin: 0 auto 10px;
+                            padding: 10px 12px;
+                            border: 1px dashed #48405f;
+                            border-radius: 10px;
+                            color: var(--muted);
+                            font-size: 12px;
+                        }
+
+                        .code-upload.visible { display: flex; align-items: center; gap: 10px; }
+                        .code-upload.dragging { border-color: var(--accent); color: var(--text); }
+
+                        .resume-upload button, .code-upload button {
+                            padding: 8px 12px;
+                            border: 1px solid #48405f;
+                            border-radius: 9px;
+                            background: #27223f;
+                            color: #c3b8ff;
+                            cursor: pointer;
+                            font: inherit;
+                            font-size: 12px;
+                        }
+
                         @media (max-width: 600px) {
                             header { padding: 14px 16px; }
                             #messages { padding: 22px 15px; }
@@ -402,6 +453,15 @@ public class HomeController {
                         </main>
 
                         <div class="composer-area">
+                            <div class="code-upload" id="codeUpload">
+                                <span>Drop PHP, HTML, CSS, JS, SQL, JSON, or TXT files here</span>
+                                <input id="codeFiles" type="file" multiple accept=".php,.html,.htm,.css,.js,.sql,.json,.txt" hidden>
+                                <button id="chooseCodeFiles" type="button">Choose files</button>
+                            </div>
+                            <div class="resume-upload" id="resumeUpload">
+                                <input id="resumeFile" type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+                                <button id="uploadResume" type="button">Upload resume/CV</button>
+                            </div>
                             <form class="composer" id="chatForm">
                                 <textarea
                                     id="messageInput"
@@ -422,6 +482,12 @@ public class HomeController {
                         const sendButton = document.getElementById("send");
                         const messages = document.getElementById("messages");
                         const welcome = document.getElementById("welcome");
+                        const resumeUpload = document.getElementById("resumeUpload");
+                        const resumeFile = document.getElementById("resumeFile");
+                        const uploadResumeButton = document.getElementById("uploadResume");
+                        const codeUpload = document.getElementById("codeUpload");
+                        const codeFiles = document.getElementById("codeFiles");
+                        const chooseCodeFilesButton = document.getElementById("chooseCodeFiles");
                         let chatMode = "digital_self";
 
                         const modeFragments = {
@@ -482,10 +548,86 @@ public class HomeController {
 
                             const bubble = document.createElement("div");
                             bubble.className = "bubble";
-                            bubble.textContent = text;
+                            if (role === "assistant") {
+                                renderFormattedText(bubble, text);
+                            } else {
+                                bubble.textContent = text;
+                            }
 
                             wrapper.append(speaker, bubble);
                             return wrapper;
+                        }
+
+                        function renderFormattedText(container, text) {
+                            const lines = String(text).replace(/\\r/g, "").split("\\n");
+                            let list = null;
+                            let listType = null;
+
+                            function closeList() {
+                                list = null;
+                                listType = null;
+                            }
+
+                            lines.forEach(line => {
+                                const heading = line.match(/^#{1,3}\\s+(.+)$/);
+                                const bullet = line.match(/^[-*•]\s+(.+)$/);
+                                const numbered = line.match(/^[0-9]+\\.\\s+(.+)$/);
+
+                                if (heading) {
+                                    closeList();
+                                    const element = document.createElement("h3");
+                                    appendInlineText(element, heading[1]);
+                                    container.appendChild(element);
+                                } else if (bullet || numbered) {
+                                    const nextType = numbered ? "ol" : "ul";
+                                    if (!list || listType !== nextType) {
+                                        list = document.createElement(nextType);
+                                        listType = nextType;
+                                        container.appendChild(list);
+                                    }
+                                    const item = document.createElement("li");
+                                    appendInlineText(item, (bullet || numbered)[1]);
+                                    list.appendChild(item);
+                                } else if (line.trim()) {
+                                    closeList();
+                                    const paragraph = document.createElement("p");
+                                    appendInlineText(paragraph, line);
+                                    container.appendChild(paragraph);
+                                } else {
+                                    closeList();
+                                }
+                            });
+                        }
+
+                        function appendInlineText(container, text) {
+                            const pattern = /(\\*\\*[^*]+\\*\\*|__[^_]+__|<b>[^<]+<\\/b>|https?:\\/\\/[^\\s]+)/gi;
+                            let position = 0;
+                            let match;
+
+                            while ((match = pattern.exec(text)) !== null) {
+                                container.append(document.createTextNode(text.slice(position, match.index)));
+                                const value = match[0];
+
+                                if (value.startsWith("**") || value.startsWith("__")) {
+                                    const strong = document.createElement("strong");
+                                    strong.textContent = value.slice(2, -2);
+                                    container.appendChild(strong);
+                                } else if (value.toLowerCase().startsWith("<b>")) {
+                                    const strong = document.createElement("strong");
+                                    strong.textContent = value.slice(3, -4);
+                                    container.appendChild(strong);
+                                } else {
+                                    const link = document.createElement("a");
+                                    link.href = value;
+                                    link.textContent = value;
+                                    link.target = "_blank";
+                                    link.rel = "noopener noreferrer";
+                                    container.appendChild(link);
+                                }
+                                position = pattern.lastIndex;
+                            }
+
+                            container.append(document.createTextNode(text.slice(position)));
                         }
 
                         async function loadConversationHistory(mode) {
@@ -588,6 +730,99 @@ public class HomeController {
                             }
                         }
 
+                        async function uploadResume() {
+                            const file = resumeFile.files[0];
+                            if (!file || sendButton.disabled) return;
+
+                            const supported = /\\.(pdf|docx)$/i.test(file.name);
+                            if (!supported) {
+                                addMessage("assistant", "Please choose a PDF or DOCX resume/CV.", true);
+                                return;
+                            }
+
+                            messages.querySelector("#welcome")?.remove();
+                            addMessage("user", "Uploaded resume/CV: " + file.name);
+                            sendButton.disabled = true;
+                            uploadResumeButton.disabled = true;
+                            const loading = addMessage("assistant", "Reading your resume/CV...");
+
+                            try {
+                                const body = new FormData();
+                                body.append("file", file);
+                                body.append("conversationId", conversationId);
+
+                                const response = await fetch("/api/training/resume", {
+                                    method: "POST",
+                                    headers: {
+                                        "Accept": "application/json",
+                                        ...await getCsrfHeaders()
+                                    },
+                                    body: body
+                                });
+                                const data = await response.json();
+                                if (!response.ok) {
+                                    throw new Error(data.message || "The resume could not be processed.");
+                                }
+
+                                loading.remove();
+                                addMessage("assistant", data.reply);
+                                renderMemorySuggestions(data.suggestions);
+                                resumeFile.value = "";
+                            } catch (error) {
+                                loading.remove();
+                                addMessage("assistant", error.message || "Unable to process the resume.", true);
+                            } finally {
+                                sendButton.disabled = false;
+                                uploadResumeButton.disabled = false;
+                            }
+                        }
+
+                        async function uploadCodeFiles(files) {
+                            if (!files.length || sendButton.disabled) return;
+                            const allowed = /\\.(php|html?|css|js|sql|json|txt)$/i;
+                            const selectedFiles = Array.from(files);
+
+                            if (selectedFiles.some(file => !allowed.test(file.name) || file.size > 200000)) {
+                                addMessage("assistant", "Use supported text files smaller than 200 KB each.", true);
+                                return;
+                            }
+
+                            sendButton.disabled = true;
+                            chooseCodeFilesButton.disabled = true;
+
+                            try {
+                                for (const file of selectedFiles) {
+                                    const loading = addMessage("assistant", "Adding coding reference: " + file.name + "...");
+                                    const body = new FormData();
+                                    body.append("file", file);
+                                    body.append("conversationId", conversationId);
+                                    const endpoint = chatMode === "training"
+                                        ? "/api/training/code-reference"
+                                        : "/api/digital-self/code-reference";
+                                    const response = await fetch(endpoint, {
+                                        method: "POST",
+                                        headers: {
+                                            "Accept": "application/json",
+                                            ...await getCsrfHeaders()
+                                        },
+                                        body: body
+                                    });
+                                    const data = await response.json();
+                                    loading.remove();
+                                    if (!response.ok) {
+                                        throw new Error(data.message || "Unable to add " + file.name + ".");
+                                    }
+                                    addMessage("assistant", data.reply);
+                                }
+                                codeFiles.value = "";
+                            } catch (error) {
+                                addMessage("assistant", error.message || "Unable to add the code files.", true);
+                            } finally {
+                                sendButton.disabled = false;
+                                chooseCodeFilesButton.disabled = false;
+                            }
+                        }
+
                         function renderMemorySuggestions(suggestions) {
                             if (!Array.isArray(suggestions)) return;
 
@@ -677,6 +912,23 @@ public class HomeController {
                             sendMessage(input.value);
                         });
 
+                        uploadResumeButton.addEventListener("click", uploadResume);
+                        chooseCodeFilesButton.addEventListener("click", () => codeFiles.click());
+                        codeFiles.addEventListener("change", () => uploadCodeFiles(codeFiles.files));
+                        ["dragenter", "dragover"].forEach(eventName => {
+                            codeUpload.addEventListener(eventName, event => {
+                                event.preventDefault();
+                                codeUpload.classList.add("dragging");
+                            });
+                        });
+                        ["dragleave", "drop"].forEach(eventName => {
+                            codeUpload.addEventListener(eventName, event => {
+                                event.preventDefault();
+                                codeUpload.classList.remove("dragging");
+                            });
+                        });
+                        codeUpload.addEventListener("drop", event => uploadCodeFiles(event.dataTransfer.files));
+
                         input.addEventListener("input", () => {
                             input.style.height = "42px";
                             input.style.height = Math.min(input.scrollHeight, 180) + "px";
@@ -719,6 +971,10 @@ public class HomeController {
 
                             chatMode = mode;
                             conversationId = getConversationId(mode);
+
+                            resumeUpload.classList.toggle("visible", mode === "training");
+                            codeUpload.classList.toggle("visible",
+                                mode === "digital_self" || mode === "training");
 
                             loadConversationHistory(mode);
 

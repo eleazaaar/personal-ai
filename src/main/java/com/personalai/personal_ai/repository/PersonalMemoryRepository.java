@@ -14,6 +14,18 @@ public class PersonalMemoryRepository {
 
     public PersonalMemoryRepository(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS personal_memories (
+                    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                    memory_text TEXT NOT NULL,
+                    memory_type ENUM('fact','preference','episodic','inference','other') NOT NULL DEFAULT 'fact',
+                    source_suggestion_id BIGINT UNSIGNED DEFAULT NULL,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    PRIMARY KEY (id),
+                    UNIQUE KEY uq_source_suggestion (source_suggestion_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                """);
     }
 
     public List<PersonalMemory> findAll() {

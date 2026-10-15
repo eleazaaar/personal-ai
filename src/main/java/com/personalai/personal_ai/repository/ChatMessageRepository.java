@@ -13,6 +13,17 @@ public class ChatMessageRepository {
 
     public ChatMessageRepository(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS chat_messages (
+                    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                    conversation_id VARCHAR(100) NOT NULL,
+                    role ENUM('user','assistant') NOT NULL,
+                    content TEXT NOT NULL,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (id),
+                    KEY idx_conversation (conversation_id, id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                """);
     }
 
     public void save(String conversationId, String role, String content) {
