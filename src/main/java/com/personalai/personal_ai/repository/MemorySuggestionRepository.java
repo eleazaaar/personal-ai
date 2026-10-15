@@ -108,23 +108,29 @@ public class MemorySuggestionRepository {
             String conversationId,
             String sourceMessage) {
 
-        // Avoid creating an identical suggestion or memory repeatedly.
+        if (memoryText == null || memoryText.isBlank()
+                || memoryText.trim().length() > 1000) {
+            return null;
+        }
+
+        String normalizedText = memoryText.trim();
+
+        // Avoid duplicates among pending suggestions and approved memories.
         Integer existing = jdbcTemplate.queryForObject(
                 """
                 SELECT
                     (SELECT COUNT(*)
                     FROM memory_suggestions
-                    WHERE LOWER(TRIM(memory_text)) =
-                        LOWER(TRIM(?)))
+                    WHERE status = 'pending'
+                    AND LOWER(TRIM(memory_text)) = LOWER(TRIM(?)))
                     +
                     (SELECT COUNT(*)
                     FROM personal_memories
-                    WHERE LOWER(TRIM(memory_text)) =
-                        LOWER(TRIM(?)))
+                    WHERE LOWER(TRIM(memory_text)) = LOWER(TRIM(?)))
                 """,
                 Integer.class,
-                memoryText,
-                memoryText
+                normalizedText,
+                normalizedText
         );
 
         if (existing != null && existing > 0) {
@@ -148,7 +154,7 @@ public class MemorySuggestionRepository {
                     Statement.RETURN_GENERATED_KEYS
             );
 
-            statement.setString(1, memoryText);
+            statement.setString(1, normalizedText);
             statement.setString(2, memoryType);
             statement.setString(3, conversationId);
             statement.setString(4, sourceMessage);

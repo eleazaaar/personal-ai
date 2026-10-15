@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.util.List;
 import java.util.Map;
@@ -23,12 +24,14 @@ public class MemoryController {
 
     // List all suggestions awaiting approval.
     @GetMapping("/pending")
+    @PreAuthorize("hasRole('ADMIN')")
     public List<MemorySuggestion> getPendingMemories() {
         return memoryRepository.findPending();
     }
 
     // Approve a suggestion and save it as a permanent memory.
     @PostMapping("/{id}/approve")
+    @PreAuthorize("hasRole('ADMIN')")
     @Transactional
     public ResponseEntity<Map<String, Object>> approveMemory(
             @PathVariable long id) {
@@ -81,6 +84,7 @@ public class MemoryController {
 
     // Reject a suggestion without saving it as a permanent memory.
     @PostMapping("/{id}/reject")
+    @PreAuthorize("hasRole('ADMIN')")
     @Transactional
     public ResponseEntity<Map<String, Object>> rejectMemory(
             @PathVariable long id) {

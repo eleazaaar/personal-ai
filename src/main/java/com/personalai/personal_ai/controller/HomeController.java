@@ -3,13 +3,17 @@ package com.personalai.personal_ai.controller;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.security.core.Authentication;
 
 @Controller
 public class HomeController {
 
     @GetMapping("/")
     @ResponseBody
-    public String home() {
+    public String home(Authentication authentication) {
+        boolean isAdmin = authentication.getAuthorities().stream()
+                .anyMatch(authority ->
+                        authority.getAuthority().equals("ROLE_ADMIN"));
         return """
                 <!DOCTYPE html>
                 <html lang="en">
@@ -320,6 +324,44 @@ public class HomeController {
                             .bubble { max-width: 92%; }
                             .welcome { margin-top: 8vh; }
                         }
+
+                        .tabs {
+                            display: flex;
+                            gap: 8px;
+                            padding: 12px 24px;
+                            border-bottom: 1px solid var(--border);
+                            background: var(--panel);
+                            overflow-x: auto;
+                        }
+
+                        .tab {
+                            flex-shrink: 0;
+                            padding: 10px 14px;
+                            border: 1px solid transparent;
+                            border-radius: 10px;
+                            background: transparent;
+                            color: var(--muted);
+                            cursor: pointer;
+                            font: inherit;
+                            font-size: 13px;
+                        }
+
+                        .tab:hover {
+                            color: var(--text);
+                            background: #242733;
+                        }
+
+                        .tab.active {
+                            border-color: #48405f;
+                            background: #27223f;
+                            color: #c3b8ff;
+                        }
+
+                        @media (max-width: 600px) {
+                            .tabs {
+                                padding: 10px 12px;
+                            }
+                        }
                     </style>
                 </head>
                 <body>
@@ -331,7 +373,19 @@ public class HomeController {
                                 <p>Your personal AI companion</p>
                             </div>
                             <div class="status">Connected</div>
+                            
+                            <form id="logoutForm" action="/logout" method="post">
+                                <input type="hidden" id="logoutCsrf" name="_csrf" value="">
+                                <button type="submit" class="logout-btn">Logout</button>
+                            </form>
                         </header>
+
+                        <nav class="tabs" aria-label="Main navigation">
+                            <button class="tab active" data-mode="digital_self">
+                                My Digital Self
+                            </button>
+                            __ADMIN_TABS__
+                        </nav>
 
                         <main id="messages" aria-live="polite">
                             <section class="welcome" id="welcome">
@@ -368,15 +422,56 @@ public class HomeController {
                         const sendButton = document.getElementById("send");
                         const messages = document.getElementById("messages");
                         const welcome = document.getElementById("welcome");
+                        let chatMode = "digital_self";
 
-                        let conversationId = sessionStorage.getItem("personalAiConversationId");
+                        const modeFragments = {
+                            digital_self: document.createDocumentFragment(),
+                            training: document.createDocumentFragment()
+                        };
+                        const loadedHistoryModes = new Set();
+                        const loadingHistoryModes = new Set();
 
-                        if (!conversationId) {
-                            conversationId = crypto.randomUUID();
-                            sessionStorage.setItem("personalAiConversationId", conversationId);
+                        let displayedMode = "digital_self";
+
+                        async function getCsrfHeaders() {
+                            const response = await fetch("/api/csrf", {
+                                method: "GET",
+                                headers: { "Accept": "application/json" }
+                            });
+
+                            if (!response.ok) {
+                                throw new Error("Unable to obtain the security token.");
+                            }
+
+                            const data = await response.json();
+
+                            return {
+                                "X-XSRF-TOKEN": data.token
+                            };
                         }
 
+                        function getConversationId(mode) {
+                            const key = "personalAiConversationId_" + mode;
+                            let id = sessionStorage.getItem(key);
+
+                            if (!id) {
+                                id = crypto.randomUUID();
+                                sessionStorage.setItem(key, id);
+                            }
+
+                            return id;
+                        }
+
+                        let conversationId = getConversationId(chatMode);
+
                         function addMessage(role, text, isError = false) {
+                            const wrapper = createMessage(role, text, isError);
+                            messages.appendChild(wrapper);
+                            messages.scrollTop = messages.scrollHeight;
+                            return wrapper;
+                        }
+
+                        function createMessage(role, text, isError = false) {
                             const wrapper = document.createElement("div");
                             wrapper.className = "message " + role +
                                 (isError ? " error" : "");
@@ -390,16 +485,62 @@ public class HomeController {
                             bubble.textContent = text;
 
                             wrapper.append(speaker, bubble);
-                            messages.appendChild(wrapper);
-                            messages.scrollTop = messages.scrollHeight;
                             return wrapper;
+                        }
+
+                        async function loadConversationHistory(mode) {
+                            if (loadedHistoryModes.has(mode) || loadingHistoryModes.has(mode)) {
+                                return;
+                            }
+
+                            loadingHistoryModes.add(mode);
+
+                            try {
+                                const id = getConversationId(mode);
+                                const endpoint = mode === "training"
+                                    ? "/api/training/history"
+                                    : "/api/digital-self/history";
+                                const response = await fetch(
+                                    endpoint + "?conversationId=" + encodeURIComponent(id),
+                                    { headers: { "Accept": "application/json" } }
+                                );
+
+                                if (!response.ok) {
+                                    throw new Error("Unable to load this conversation.");
+                                }
+
+                                const history = await response.json();
+                                if (!Array.isArray(history)) {
+                                    throw new Error("The server returned an unexpected history response.");
+                                }
+
+                                const container = mode === displayedMode
+                                    ? messages
+                                    : modeFragments[mode];
+                                container.querySelector?.("#welcome")?.remove();
+
+                                history.forEach(turn => {
+                                    if (turn.role === "user" || turn.role === "assistant") {
+                                        container.appendChild(createMessage(turn.role, turn.content));
+                                    }
+                                });
+
+                                loadedHistoryModes.add(mode);
+                                if (mode === displayedMode) {
+                                    messages.scrollTop = messages.scrollHeight;
+                                }
+                            } catch (error) {
+                                console.error("Conversation history could not be loaded:", error);
+                            } finally {
+                                loadingHistoryModes.delete(mode);
+                            }
                         }
 
                         async function sendMessage(message) {
                             message = message.trim();
                             if (!message || sendButton.disabled) return;
 
-                            welcome?.remove();
+                            messages.querySelector("#welcome")?.remove();
                             addMessage("user", message);
                             input.value = "";
                             input.style.height = "42px";
@@ -408,11 +549,13 @@ public class HomeController {
                             const loading = addMessage("assistant", "Thinking...");
 
                             try {
-                                const response = await fetch("/api/chat", {
+                                const endpoint = chatMode === "training" ? "/api/training" : "/api/digital-self";
+                                const response = await fetch(endpoint, {
                                     method: "POST",
                                     headers: {
                                         "Content-Type": "application/json",
-                                        "Accept": "application/json"
+                                        "Accept": "application/json",
+                                        ...await getCsrfHeaders()
                                     },
                                     body: JSON.stringify({
                                         conversationId: conversationId,
@@ -489,7 +632,10 @@ public class HomeController {
                                             "/" + action,
                                             {
                                                 method: "POST",
-                                                headers: { "Accept": "application/json" }
+                                                headers: {
+                                                    "Accept": "application/json",
+                                                    ...await getCsrfHeaders()
+                                                }
                                             }
                                         );
 
@@ -548,9 +694,108 @@ public class HomeController {
                                 sendMessage(button.dataset.message);
                             });
                         });
+
+                        const tabs = document.querySelectorAll(".tab");
+                        const welcomeTitle = document.querySelector("#welcome h2");
+                        const welcomeDescription = document.querySelector("#welcome p");
+                        const messageInput = document.getElementById("messageInput");
+
+                        function switchMode(mode) {
+                            if (mode !== "training" && mode !== "digital_self") return;
+
+                            // Prevent switching while an AI request is in progress.
+                            if (sendButton.disabled && mode !== displayedMode) return;
+
+                            // Save the currently displayed conversation.
+                            if (mode !== displayedMode) {
+                                while (messages.firstChild) {
+                                    modeFragments[displayedMode].appendChild(messages.firstChild);
+                                }
+
+                                // Restore the selected mode's saved conversation.
+                                messages.appendChild(modeFragments[mode]);
+                                displayedMode = mode;
+                            }
+
+                            chatMode = mode;
+                            conversationId = getConversationId(mode);
+
+                            loadConversationHistory(mode);
+
+                            tabs.forEach(tab => {
+                                const active = tab.dataset.mode === mode;
+                                tab.classList.toggle("active", active);
+                                tab.setAttribute("aria-pressed", String(active));
+                            });
+
+                            // Show a welcome section for a new or empty conversation.
+                            if (!messages.querySelector(".message, .memory-card")) {
+                                let currentWelcome = messages.querySelector("#welcome");
+
+                                if (!currentWelcome) {
+                                    currentWelcome = document.createElement("section");
+                                    currentWelcome.id = "welcome";
+                                    currentWelcome.innerHTML = "<h2></h2><p></p>";
+                                    messages.appendChild(currentWelcome);
+                                }
+
+                                const title = currentWelcome.querySelector("h2");
+                                const description = currentWelcome.querySelector("p");
+
+                                if (mode === "training") {
+                                    title.textContent = "Training Studio";
+                                    description.textContent =
+                                        "Teach your AI about your preferences, experiences, goals, and values. Review memory suggestions before saving them.";
+
+                                    input.placeholder = "Tell your AI something about yourself...";
+                                } else {
+                                    title.textContent = "My Digital Self";
+                                    description.textContent =
+                                        "Chat with your digital self using your approved memories to help answer questions and evaluate decisions.";
+
+                                    input.placeholder = "Talk to your Digital Self...";
+                                }
+                            }
+
+                            messages.scrollTop = messages.scrollHeight;
+                        }
+
+                        tabs.forEach(tab => {
+                            tab.addEventListener("click", () => {
+                                switchMode(tab.dataset.mode);
+                            });
+                        });
+
+                        switchMode("digital_self");
+
+                        async function prepareLogout() {
+                            try {
+                                const response = await fetch('/api/csrf', {
+                                    credentials: 'same-origin'
+                                });
+
+                                if (!response.ok) {
+                                    throw new Error('Could not retrieve CSRF token.');
+                                }
+
+                                const data = await response.json();
+                                document.getElementById('logoutCsrf').value = data.token;
+                            } catch (error) {
+                                console.error('Logout setup failed:', error);
+                            }
+                        }
+
+                        prepareLogout();
                     </script>
                 </body>
                 </html>
-                """;
+                """.replace(
+                "__ADMIN_TABS__",
+                        isAdmin ? """
+                            <button class="tab" data-mode="training">
+                                Training Studio
+                            </button>
+                            """ : ""
+                );
     }
 }
