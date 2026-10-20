@@ -1,0 +1,1389 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal AI</title>
+
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
+    <style>
+        :root {
+            color-scheme: dark;
+            --bg: #111318;
+            --panel: #191c24;
+            --border: #2c303b;
+            --text: #f3f4f8;
+            --muted: #969cad;
+            --accent: #8b78ff;
+            --user: #5142b5;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: var(--bg);
+            color: var(--text);
+            font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont,
+                         "Segoe UI", sans-serif;
+        }
+
+        .app {
+            display: flex;
+            flex-direction: column;
+            max-width: 1000px;
+            height: 100vh;
+            height: 100dvh;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 18px 24px;
+            border-bottom: 1px solid var(--border);
+            background: var(--panel);
+        }
+
+        .logo {
+            display: grid;
+            place-items: center;
+            width: 42px;
+            height: 42px;
+            flex-shrink: 0;
+            border-radius: 13px;
+            background: var(--accent);
+            color: white;
+            font-size: 21px;
+            font-weight: 700;
+        }
+
+        .brand h1 {
+            margin: 0;
+            font-size: 17px;
+            font-weight: 650;
+        }
+
+        .brand p {
+            margin: 4px 0 0;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .ollama-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: auto;
+            font-size: 13px;
+            color: #d1d5db;
+        }
+
+        .status-dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: #9ca3af;
+            flex-shrink: 0;
+        }
+
+        .status-dot.online { background: #22c55e; }
+        .status-dot.offline { background: #ef4444; }
+
+        .logout-btn {
+            padding: 9px 12px;
+            border: 1px solid var(--border);
+            border-radius: 9px;
+            background: #242733;
+            color: var(--text);
+            cursor: pointer;
+        }
+
+        .logout-btn:disabled {
+            cursor: not-allowed;
+            opacity: .5;
+        }
+
+        #logoutError {
+            color: #ffb8c0;
+            font-size: 12px;
+        }
+
+        #messages {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            padding: 28px 24px;
+            scroll-behavior: smooth;
+        }
+
+        .welcome {
+            max-width: 540px;
+            margin: 12vh auto 0;
+            text-align: center;
+        }
+
+        .welcome-icon {
+            display: grid;
+            place-items: center;
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 18px;
+            border-radius: 20px;
+            background: #27223f;
+            color: #c3b8ff;
+            font-size: 30px;
+        }
+
+        .welcome h2 {
+            margin: 0 0 10px;
+            font-size: clamp(23px, 4vw, 31px);
+        }
+
+        .welcome p {
+            margin: 0;
+            color: var(--muted);
+            line-height: 1.7;
+        }
+
+        .suggestions {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 24px;
+        }
+
+        .suggestion {
+            padding: 10px 13px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            background: var(--panel);
+            color: var(--text);
+            cursor: pointer;
+            font: inherit;
+            font-size: 13px;
+        }
+
+        .suggestion:hover { border-color: var(--accent); }
+
+        .message {
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+            margin: 0 auto 24px;
+            max-width: 760px;
+        }
+
+        .message.user { align-items: flex-end; }
+        .message.assistant { align-items: flex-start; }
+
+        .speaker {
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .bubble {
+            max-width: min(85%, 680px);
+            padding: 13px 16px;
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            background: var(--panel);
+            line-height: 1.7;
+            overflow-wrap: anywhere;
+            white-space: pre-wrap;
+        }
+
+        .bubble h3 {
+            margin: 14px 0 6px;
+            color: #d9d2ff;
+            font-size: 14px;
+        }
+
+        .bubble h3:first-child { margin-top: 0; }
+        .bubble p { margin: 0 0 8px; }
+        .bubble p:last-child { margin-bottom: 0; }
+
+        .bubble ul, .bubble ol {
+            margin: 4px 0 10px;
+            padding-left: 21px;
+        }
+
+        .bubble a { color: #c3b8ff; }
+
+        .user .bubble {
+            border-color: transparent;
+            background: var(--user);
+        }
+
+        .error .bubble {
+            border-color: #743b45;
+            color: #ffb8c0;
+        }
+
+        .composer-area {
+            padding: 16px 24px 20px;
+            border-top: 1px solid var(--border);
+            background: var(--bg);
+        }
+
+        .composer {
+            display: flex;
+            align-items: flex-end;
+            gap: 12px;
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 10px;
+            border: 1px solid #383d4a;
+            border-radius: 17px;
+            background: var(--panel);
+        }
+
+        textarea {
+            flex: 1;
+            width: 100%;
+            max-height: 180px;
+            min-height: 42px;
+            padding: 10px;
+            resize: none;
+            border: 0;
+            outline: none;
+            background: transparent;
+            color: var(--text);
+            font: inherit;
+            line-height: 1.5;
+        }
+
+        textarea::placeholder { color: var(--muted); }
+
+        #send {
+            display: grid;
+            place-items: center;
+            flex-shrink: 0;
+            width: 42px;
+            height: 42px;
+            border: 0;
+            border-radius: 12px;
+            background: var(--accent);
+            color: white;
+            cursor: pointer;
+            font-size: 19px;
+        }
+
+        #send:disabled {
+            cursor: not-allowed;
+            opacity: .5;
+        }
+
+        .hint {
+            margin: 10px 0 0;
+            color: var(--muted);
+            font-size: 11px;
+            text-align: center;
+        }
+
+        .memory-card {
+            width: 100%;
+            max-width: 680px;
+            margin: 0 auto 24px;
+            padding: 16px;
+            border: 1px solid #48405f;
+            border-radius: 14px;
+            background: #1d1b29;
+        }
+
+        .memory-card h3 {
+            margin: 0 0 8px;
+            font-size: 14px;
+        }
+
+        .memory-card .memory-text {
+            margin-bottom: 10px;
+            line-height: 1.6;
+            overflow-wrap: anywhere;
+        }
+
+        .memory-card .memory-type {
+            margin-bottom: 14px;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .memory-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .memory-actions button {
+            padding: 9px 13px;
+            border: 1px solid var(--border);
+            border-radius: 9px;
+            background: var(--panel);
+            color: var(--text);
+            cursor: pointer;
+        }
+
+        .memory-actions .approve-memory {
+            border-color: #437957;
+            background: #244832;
+        }
+
+        .memory-actions button:disabled {
+            cursor: not-allowed;
+            opacity: .6;
+        }
+
+        .memory-result {
+            margin-top: 10px;
+            color: #9ce4b2;
+            font-size: 12px;
+        }
+
+        .resume-upload {
+            display: none;
+            max-width: 760px;
+            margin: 0 auto 10px;
+        }
+
+        .resume-upload.visible { display: flex; gap: 8px; }
+
+        .code-upload {
+            display: none;
+            max-width: 760px;
+            margin: 0 auto 10px;
+            padding: 10px 12px;
+            border: 1px dashed #48405f;
+            border-radius: 10px;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .code-upload.visible {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .code-upload.dragging {
+            border-color: var(--accent);
+            color: var(--text);
+        }
+
+        .resume-upload button,
+        .code-upload button {
+            padding: 8px 12px;
+            border: 1px solid #48405f;
+            border-radius: 9px;
+            background: #27223f;
+            color: #c3b8ff;
+            cursor: pointer;
+            font: inherit;
+            font-size: 12px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 8px;
+            padding: 12px 24px;
+            border-bottom: 1px solid var(--border);
+            background: var(--panel);
+            overflow-x: auto;
+        }
+
+        .tab {
+            flex-shrink: 0;
+            padding: 10px 14px;
+            border: 1px solid transparent;
+            border-radius: 10px;
+            background: transparent;
+            color: var(--muted);
+            cursor: pointer;
+            font: inherit;
+            font-size: 13px;
+        }
+
+        .tab:hover {
+            color: var(--text);
+            background: #242733;
+        }
+
+        .tab.active {
+            border-color: #48405f;
+            background: #27223f;
+            color: #c3b8ff;
+        }
+
+        @media (max-width: 600px) {
+            header {
+                flex-wrap: wrap;
+                padding: 14px 16px;
+            }
+
+            .ollama-status {
+                margin-left: auto;
+                font-size: 11px;
+            }
+
+            #messages { padding: 22px 15px; }
+
+            .composer-area { padding: 12px 12px 15px; }
+            .bubble { max-width: 92%; }
+            .welcome { margin-top: 8vh; }
+            .tabs { padding: 10px 12px; }
+
+            #logoutError { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+<div class="app">
+    <header>
+        <div class="logo">✳</div>
+
+        <div class="brand">
+            <h1>Personal AI</h1>
+            <p>Your personal AI companion</p>
+        </div>
+
+        <div id="ollama-status" class="ollama-status" role="status">
+            <span id="ollama-status-dot" class="status-dot"></span>
+            <span id="ollama-status-text">Checking Ollama Cloud...</span>
+        </div>
+
+        <form id="logoutForm" action="/logout" method="post">
+            <button type="submit" class="logout-btn">Logout</button>
+        </form>
+
+        <span id="logoutError" role="alert" hidden>
+            Logout failed. Please try again.
+        </span>
+    </header>
+
+    <nav class="tabs" aria-label="Main navigation">
+        <button type="button" class="tab active" data-mode="digital_self">
+            My Digital Self
+        </button>
+
+        <button type="button" class="tab"
+                data-mode="training" th:if="${isAdmin}">
+            Training Studio
+        </button>
+    </nav>
+
+    <main id="messages" aria-live="polite">
+        <section class="welcome" id="welcome">
+            <div class="welcome-icon">✳</div>
+            <h2>What would you like to talk about?</h2>
+            <p>Your personal AI is ready to help you think,
+               plan, learn, and organize your ideas.</p>
+
+            <div class="suggestions">
+                <button type="button" class="suggestion"
+                        data-message="Introduce yourself and explain how you can help me.">
+                    Meet your AI
+                </button>
+
+                <button type="button" class="suggestion"
+                        data-message="Help me organize my goals for this week.">
+                    Organize my goals
+                </button>
+
+                <button type="button" class="suggestion"
+                        data-message="What kinds of things could you help me remember?">
+                    Explore personal memory
+                </button>
+            </div>
+        </section>
+    </main>
+
+    <div class="composer-area">
+        <div class="code-upload" id="codeUpload">
+            <span>Drop PHP, HTML, CSS, JS, SQL, JSON, or TXT files here</span>
+
+            <input id="codeFiles" type="file" multiple
+                   accept=".php,.html,.htm,.css,.js,.sql,.json,.txt" hidden>
+
+            <button type="button" id="chooseCodeFiles">Choose files</button>
+        </div>
+
+        <div class="resume-upload" id="resumeUpload">
+            <input id="resumeFile" type="file"
+                   accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+
+            <button type="button" id="uploadResume">Upload resume/CV</button>
+        </div>
+
+        <form class="composer" id="chatForm">
+            <textarea
+                id="messageInput"
+                placeholder="Message your Personal AI..."
+                rows="1"
+                maxlength="10000"
+                aria-label="Your message"
+                required></textarea>
+
+            <button id="send" type="submit" aria-label="Send message">➤</button>
+        </form>
+
+        <p class="hint">Enter to send · Shift + Enter for a new line</p>
+    </div>
+</div>
+
+<script>
+    $(function () {
+        const $form = $("#chatForm");
+        const $input = $("#messageInput");
+        const $sendButton = $("#send");
+        const $messages = $("#messages");
+        const $ollamaStatusDot = $("#ollama-status-dot");
+        const $ollamaStatusText = $("#ollama-status-text");
+        const $logoutForm = $("#logoutForm");
+        const $logoutError = $("#logoutError");
+        const $resumeUpload = $("#resumeUpload");
+        const $resumeFile = $("#resumeFile");
+        const $uploadResumeButton = $("#uploadResume");
+        const $codeUpload = $("#codeUpload");
+        const $codeFiles = $("#codeFiles");
+        const $chooseCodeFilesButton = $("#chooseCodeFiles");
+
+        let chatMode = "digital_self";
+        let displayedMode = "digital_self";
+
+        const modeFragments = {
+            digital_self: document.createDocumentFragment(),
+            training: document.createDocumentFragment()
+        };
+
+        const loadedHistoryModes = new Set();
+        const loadingHistoryModes = new Set();
+
+        /*
+         * Shared AJAX wrapper.
+         * All HTTP requests below use jQuery $.ajax().
+         * Errors are converted into ordinary JavaScript Error objects
+         * so the existing try/catch flow remains easy to follow.
+         */
+        function ajaxRequest(options) {
+            return new Promise(function (resolve, reject) {
+                $.ajax($.extend({
+                    dataType: "json",
+                    cache: false
+                }, options))
+                .done(function (data, textStatus, jqXHR) {
+                    resolve({
+                        data: data,
+                        status: jqXHR.status,
+                        xhr: jqXHR
+                    });
+                })
+                .fail(function (jqXHR, textStatus, errorThrown) {
+                    let message = "The request failed.";
+
+                    if (jqXHR.responseJSON &&
+                        typeof jqXHR.responseJSON.message === "string") {
+                        message = jqXHR.responseJSON.message;
+                    } else if (jqXHR.status) {
+                        message = "Request failed (HTTP " +
+                            jqXHR.status + ").";
+                    } else if (textStatus === "timeout") {
+                        message = "The request timed out. Please try again.";
+                    } else if (textStatus === "parsererror") {
+                        message = "The server returned an invalid JSON response.";
+                    } else if (errorThrown) {
+                        message = String(errorThrown);
+                    } else if (textStatus === "abort") {
+                        message = "The request was cancelled.";
+                    }
+
+                    const error = new Error(message);
+                    error.status = jqXHR.status;
+                    error.responseJSON = jqXHR.responseJSON;
+                    error.responseText = jqXHR.responseText;
+                    error.jqXHR = jqXHR;
+
+                    reject(error);
+                });
+            });
+        }
+
+        async function getCsrfHeaders() {
+            const response = await ajaxRequest({
+                url: "/api/csrf",
+                method: "GET",
+                headers: {
+                    "Accept": "application/json"
+                }
+            });
+
+            if (!response.data ||
+                typeof response.data.token !== "string" ||
+                !response.data.token) {
+                throw new Error("The server did not return a valid security token.");
+            }
+
+            return {
+                "X-XSRF-TOKEN": response.data.token
+            };
+        }
+
+        function getConversationId(mode) {
+            const key = "personalAiConversationId_" + mode;
+            let id = sessionStorage.getItem(key);
+
+            if (!id) {
+                if (window.crypto && typeof window.crypto.randomUUID === "function") {
+                    id = window.crypto.randomUUID();
+                } else {
+                    id = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+                        const r = Math.random() * 16 | 0;
+                        const v = c === "x" ? r : (r & 0x3 | 0x8);
+                        return v.toString(16);
+                    });
+                }
+
+                sessionStorage.setItem(key, id);
+            }
+
+            return id;
+        }
+
+        let conversationId = getConversationId(chatMode);
+
+        async function refreshOllamaStatus() {
+            try {
+                const response = await ajaxRequest({
+                    url: "/api/ollama/status",
+                    method: "GET",
+                    headers: {
+                        "Accept": "application/json"
+                    },
+                    timeout: 15000
+                });
+
+                const data = response.data;
+
+                if (data.status !== "connected" &&
+                    data.status !== "disconnected") {
+                    throw new Error("Unexpected status response.");
+                }
+
+                const connected = data.status === "connected";
+
+                $ollamaStatusDot
+                    .toggleClass("online", connected)
+                    .toggleClass("offline", !connected);
+
+                $ollamaStatusText.text(
+                    data.message || (connected
+                        ? "Ollama Cloud Connected"
+                        : "Ollama Cloud Disconnected")
+                );
+            } catch (error) {
+                $ollamaStatusDot
+                    .removeClass("online")
+                    .addClass("offline");
+
+                $ollamaStatusText.text("Ollama Cloud Status Unavailable");
+
+                console.error("Ollama Cloud status check failed:", error);
+            }
+        }
+
+        function addMessage(role, text, isError = false) {
+            const $wrapper = $(createMessage(role, text, isError));
+            $messages.append($wrapper);
+            scrollToBottom();
+            return $wrapper;
+        }
+
+        function createMessage(role, text, isError = false) {
+            const wrapper = document.createElement("div");
+
+            wrapper.className = "message " + role +
+                (isError ? " error" : "");
+
+            const speaker = document.createElement("div");
+            speaker.className = "speaker";
+            speaker.textContent = role === "user" ? "You" : "Personal AI";
+
+            const bubble = document.createElement("div");
+            bubble.className = "bubble";
+
+            if (role === "assistant") {
+                renderFormattedText(bubble, text);
+            } else {
+                bubble.textContent = text;
+            }
+
+            wrapper.append(speaker, bubble);
+            return wrapper;
+        }
+
+        function renderFormattedText(container, text) {
+            const lines = String(text).replace(/\r/g, "").split("\n");
+            let list = null;
+            let listType = null;
+
+            function closeList() {
+                list = null;
+                listType = null;
+            }
+
+            lines.forEach(function (line) {
+                const heading = line.match(/^#{1,3}\s+(.+)$/);
+                const bullet = line.match(/^[-*•]\s+(.+)$/);
+                const numbered = line.match(/^[0-9]+\.\s+(.+)$/);
+
+                if (heading) {
+                    closeList();
+
+                    const element = document.createElement("h3");
+                    appendInlineText(element, heading[1]);
+                    container.appendChild(element);
+                } else if (bullet || numbered) {
+                    const nextType = numbered ? "ol" : "ul";
+
+                    if (!list || listType !== nextType) {
+                        list = document.createElement(nextType);
+                        listType = nextType;
+                        container.appendChild(list);
+                    }
+
+                    const item = document.createElement("li");
+                    appendInlineText(item, (bullet || numbered)[1]);
+                    list.appendChild(item);
+                } else if (line.trim()) {
+                    closeList();
+
+                    const paragraph = document.createElement("p");
+                    appendInlineText(paragraph, line);
+                    container.appendChild(paragraph);
+                } else {
+                    closeList();
+                }
+            });
+        }
+
+        function appendInlineText(container, text) {
+            const pattern = /(\*\*[^*]+\*\*|__[^_]+__|<b>[^<]+<\/b>|https?:\/\/[^\s]+)/gi;
+            let position = 0;
+            let match;
+
+            while ((match = pattern.exec(text)) !== null) {
+                container.append(
+                    document.createTextNode(text.slice(position, match.index))
+                );
+
+                const value = match[0];
+
+                if (value.startsWith("**") || value.startsWith("__")) {
+                    const strong = document.createElement("strong");
+                    strong.textContent = value.slice(2, -2);
+                    container.appendChild(strong);
+                } else if (value.toLowerCase().startsWith("<b>")) {
+                    const strong = document.createElement("strong");
+                    strong.textContent = value.slice(3, -4);
+                    container.appendChild(strong);
+                } else {
+                    const link = document.createElement("a");
+                    link.href = value;
+                    link.textContent = value;
+                    link.target = "_blank";
+                    link.rel = "noopener noreferrer";
+                    container.appendChild(link);
+                }
+
+                position = pattern.lastIndex;
+            }
+
+            container.append(
+                document.createTextNode(text.slice(position))
+            );
+        }
+
+        function scrollToBottom() {
+            $messages.scrollTop($messages[0].scrollHeight);
+        }
+
+        function removeWelcome() {
+            $messages.find("#welcome").remove();
+        }
+
+        async function loadConversationHistory(mode) {
+            if (loadedHistoryModes.has(mode) ||
+                loadingHistoryModes.has(mode)) {
+                return;
+            }
+
+            loadingHistoryModes.add(mode);
+
+            try {
+                const id = getConversationId(mode);
+                const endpoint = mode === "training"
+                    ? "/api/training/history"
+                    : "/api/digital-self/history";
+
+                const response = await ajaxRequest({
+                    url: endpoint,
+                    method: "GET",
+                    data: {
+                        conversationId: id
+                    },
+                    headers: {
+                        "Accept": "application/json"
+                    }
+                });
+
+                const history = response.data;
+
+                if (!Array.isArray(history)) {
+                    throw new Error(
+                        "The server returned an unexpected history response."
+                    );
+                }
+
+                const container = mode === displayedMode
+                    ? $messages[0]
+                    : modeFragments[mode];
+
+                const oldWelcome = container.querySelector("#welcome");
+
+                if (oldWelcome) {
+                    oldWelcome.remove();
+                }
+
+                history.forEach(function (turn) {
+                    if (turn.role === "user" ||
+                        turn.role === "assistant") {
+                        container.appendChild(
+                            createMessage(turn.role, turn.content)
+                        );
+                    }
+                });
+
+                loadedHistoryModes.add(mode);
+
+                if (mode === displayedMode) {
+                    scrollToBottom();
+                }
+            } catch (error) {
+                console.error(
+                    "Conversation history could not be loaded:",
+                    error
+                );
+            } finally {
+                loadingHistoryModes.delete(mode);
+            }
+        }
+
+        async function sendMessage(message) {
+            message = message.trim();
+
+            if (!message || $sendButton.prop("disabled")) {
+                return;
+            }
+
+            removeWelcome();
+
+            addMessage("user", message);
+
+            $input.val("").css("height", "42px");
+            $sendButton.prop("disabled", true);
+
+            const $loading = addMessage("assistant", "Thinking...");
+
+            try {
+                const endpoint = chatMode === "training"
+                    ? "/api/training"
+                    : "/api/digital-self";
+
+                const csrfHeaders = await getCsrfHeaders();
+
+                const response = await ajaxRequest({
+                    url: endpoint,
+                    method: "POST",
+                    contentType: "application/json",
+                    dataType: "json",
+                    headers: $.extend({
+                        "Accept": "application/json"
+                    }, csrfHeaders),
+                    data: JSON.stringify({
+                        conversationId: conversationId,
+                        message: message
+                    })
+                });
+
+                $loading.remove();
+
+                const data = response.data;
+
+                if (!data || typeof data.reply !== "string") {
+                    throw new Error(
+                        "The server returned an unexpected response."
+                    );
+                }
+
+                addMessage("assistant", data.reply);
+                renderMemorySuggestions(data.suggestions);
+            } catch (error) {
+                $loading.remove();
+
+                addMessage(
+                    "assistant",
+                    error.message ||
+                        "Unable to contact the AI. Please try again.",
+                    true
+                );
+            } finally {
+                $sendButton.prop("disabled", false);
+                $input.trigger("focus");
+            }
+        }
+
+        async function uploadResume() {
+            const file = $resumeFile[0].files[0];
+
+            if (!file || $sendButton.prop("disabled")) {
+                return;
+            }
+
+            if (!/\.(pdf|docx)$/i.test(file.name)) {
+                addMessage(
+                    "assistant",
+                    "Please choose a PDF or DOCX resume/CV.",
+                    true
+                );
+                return;
+            }
+
+            removeWelcome();
+            addMessage("user", "Uploaded resume/CV: " + file.name);
+
+            $sendButton.prop("disabled", true);
+            $uploadResumeButton.prop("disabled", true);
+
+            const $loading = addMessage(
+                "assistant",
+                "Reading your resume/CV..."
+            );
+
+            try {
+                const body = new FormData();
+                body.append("file", file);
+                body.append("conversationId", conversationId);
+
+                const csrfHeaders = await getCsrfHeaders();
+
+                const response = await ajaxRequest({
+                    url: "/api/training/resume",
+                    method: "POST",
+                    data: body,
+                    processData: false,
+                    contentType: false,
+                    dataType: "json",
+                    headers: $.extend({
+                        "Accept": "application/json"
+                    }, csrfHeaders)
+                });
+
+                $loading.remove();
+
+                const data = response.data;
+
+                if (!data || typeof data.reply !== "string") {
+                    throw new Error(
+                        "The server returned an unexpected response."
+                    );
+                }
+
+                addMessage("assistant", data.reply);
+                renderMemorySuggestions(data.suggestions);
+
+                $resumeFile.val("");
+            } catch (error) {
+                $loading.remove();
+
+                addMessage(
+                    "assistant",
+                    error.message || "Unable to process the resume.",
+                    true
+                );
+            } finally {
+                $sendButton.prop("disabled", false);
+                $uploadResumeButton.prop("disabled", false);
+            }
+        }
+
+        async function uploadCodeFiles(files) {
+            if (!files.length || $sendButton.prop("disabled")) {
+                return;
+            }
+
+            const allowed = /\.(php|html?|css|js|sql|json|txt)$/i;
+            const selectedFiles = Array.from(files);
+
+            if (selectedFiles.some(function (file) {
+                return !allowed.test(file.name) || file.size > 200000;
+            })) {
+                addMessage(
+                    "assistant",
+                    "Use supported text files smaller than 200 KB each.",
+                    true
+                );
+                return;
+            }
+
+            $sendButton.prop("disabled", true);
+            $chooseCodeFilesButton.prop("disabled", true);
+
+            try {
+                for (const file of selectedFiles) {
+                    const $loading = addMessage(
+                        "assistant",
+                        "Adding coding reference: " + file.name + "..."
+                    );
+
+                    try {
+                        const body = new FormData();
+                        body.append("file", file);
+                        body.append("conversationId", conversationId);
+
+                        const endpoint = chatMode === "training"
+                            ? "/api/training/code-reference"
+                            : "/api/digital-self/code-reference";
+
+                        const csrfHeaders = await getCsrfHeaders();
+
+                        const response = await ajaxRequest({
+                            url: endpoint,
+                            method: "POST",
+                            data: body,
+                            processData: false,
+                            contentType: false,
+                            dataType: "json",
+                            headers: $.extend({
+                                "Accept": "application/json"
+                            }, csrfHeaders)
+                        });
+
+                        $loading.remove();
+
+                        const data = response.data;
+
+                        if (!data || typeof data.reply !== "string") {
+                            throw new Error(
+                                "The server returned an unexpected response."
+                            );
+                        }
+
+                        addMessage("assistant", data.reply);
+                    } catch (error) {
+                        $loading.remove();
+                        throw new Error(
+                            error.message || "Unable to add " + file.name + "."
+                        );
+                    }
+                }
+
+                $codeFiles.val("");
+            } catch (error) {
+                addMessage(
+                    "assistant",
+                    error.message || "Unable to add the code files.",
+                    true
+                );
+            } finally {
+                $sendButton.prop("disabled", false);
+                $chooseCodeFilesButton.prop("disabled", false);
+            }
+        }
+
+        function renderMemorySuggestions(suggestions) {
+            if (!Array.isArray(suggestions)) {
+                return;
+            }
+
+            suggestions.forEach(function (suggestion) {
+                const card = document.createElement("section");
+                card.className = "memory-card";
+
+                const heading = document.createElement("h3");
+                heading.textContent = "Suggested memory — review required";
+
+                const memoryText = document.createElement("div");
+                memoryText.className = "memory-text";
+                memoryText.textContent = suggestion.memoryText || "";
+
+                const type = document.createElement("div");
+                type.className = "memory-type";
+                type.textContent = "Category: " +
+                    (suggestion.memoryType || "General");
+
+                const actions = document.createElement("div");
+                actions.className = "memory-actions";
+
+                const approve = document.createElement("button");
+                approve.type = "button";
+                approve.className = "approve-memory";
+                approve.textContent = "Approve";
+
+                const reject = document.createElement("button");
+                reject.type = "button";
+                reject.textContent = "Reject";
+
+                const result = document.createElement("div");
+                result.className = "memory-result";
+                result.setAttribute("aria-live", "polite");
+
+                async function reviewMemory(action) {
+                    approve.disabled = true;
+                    reject.disabled = true;
+                    result.textContent = "Processing...";
+
+                    try {
+                        const csrfHeaders = await getCsrfHeaders();
+
+                        const response = await ajaxRequest({
+                            url: "/api/memories/" +
+                                encodeURIComponent(suggestion.id) +
+                                "/" + action,
+                            method: "POST",
+                            headers: $.extend({
+                                "Accept": "application/json"
+                            }, csrfHeaders)
+                        });
+
+                        const data = response.data;
+
+                        result.textContent = action === "approve"
+                            ? "Memory approved and saved."
+                            : "Suggestion rejected.";
+
+                        actions.remove();
+                    } catch (error) {
+                        result.textContent =
+                            error.message ||
+                            "Unable to contact the server.";
+
+                        approve.disabled = false;
+                        reject.disabled = false;
+                    }
+                }
+
+                approve.addEventListener("click", function () {
+                    reviewMemory("approve");
+                });
+
+                reject.addEventListener("click", function () {
+                    reviewMemory("reject");
+                });
+
+                actions.append(approve, reject);
+                card.append(heading, memoryText, type, actions, result);
+                $messages.append(card);
+            });
+
+            scrollToBottom();
+        }
+
+        // Chat submission
+        $form.on("submit", function (event) {
+            event.preventDefault();
+            sendMessage($input.val());
+        });
+
+        // File uploads
+        $uploadResumeButton.on("click", uploadResume);
+
+        $chooseCodeFilesButton.on("click", function () {
+            $codeFiles.trigger("click");
+        });
+
+        $codeFiles.on("change", function () {
+            uploadCodeFiles(this.files);
+        });
+
+        ["dragenter", "dragover"].forEach(function (eventName) {
+            $codeUpload.on(eventName, function (event) {
+                event.preventDefault();
+                $codeUpload.addClass("dragging");
+            });
+        });
+
+        ["dragleave", "drop"].forEach(function (eventName) {
+            $codeUpload.on(eventName, function (event) {
+                event.preventDefault();
+                $codeUpload.removeClass("dragging");
+            });
+        });
+
+        $codeUpload.on("drop", function (event) {
+            const originalEvent = event.originalEvent;
+            const files = originalEvent.dataTransfer.files;
+            uploadCodeFiles(files);
+        });
+
+        // Auto-resize the message input
+        $input.on("input", function () {
+            this.style.height = "42px";
+            this.style.height = Math.min(this.scrollHeight, 180) + "px";
+        });
+
+        // Enter to send; Shift+Enter for a newline
+        $input.on("keydown", function (event) {
+            if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                $form.trigger("submit");
+            }
+        });
+
+        // Suggested messages
+        $(document).on("click", ".suggestion", function () {
+            sendMessage($(this).data("message"));
+        });
+
+        // Switch between Digital Self and Training Studio
+        const $tabs = $(".tab");
+
+        function switchMode(mode) {
+            if (mode !== "training" && mode !== "digital_self") {
+                return;
+            }
+
+            // Prevent switching while a request is in progress.
+            if ($sendButton.prop("disabled") &&
+                mode !== displayedMode) {
+                return;
+            }
+
+            if (mode !== displayedMode) {
+                while ($messages[0].firstChild) {
+                    modeFragments[displayedMode].appendChild(
+                        $messages[0].firstChild
+                    );
+                }
+
+                $messages[0].appendChild(modeFragments[mode]);
+                displayedMode = mode;
+            }
+
+            chatMode = mode;
+            conversationId = getConversationId(mode);
+
+            $resumeUpload.toggleClass("visible", mode === "training");
+
+            $codeUpload.toggleClass(
+                "visible",
+                mode === "digital_self" || mode === "training"
+            );
+
+            $tabs.each(function () {
+                const active = $(this).data("mode") === mode;
+
+                $(this)
+                    .toggleClass("active", active)
+                    .attr("aria-pressed", String(active));
+            });
+
+            if (!$messages.find(".message, .memory-card").length) {
+                let $currentWelcome = $messages.find("#welcome");
+
+                if (!$currentWelcome.length) {
+                    $currentWelcome = $(
+                        '<section class="welcome" id="welcome">' +
+                            '<div class="welcome-icon">✳</div>' +
+                            '<h2></h2>' +
+                            '<p></p>' +
+                        '</section>'
+                    );
+
+                    $messages.append($currentWelcome);
+                }
+
+                if (mode === "training") {
+                    $currentWelcome.find("h2").text("Training Studio");
+
+                    $currentWelcome.find("p").text(
+                        "Teach your AI about your preferences, experiences, " +
+                        "goals, and values. Review memory suggestions before saving them."
+                    );
+
+                    $input.attr(
+                        "placeholder",
+                        "Tell your AI something about yourself..."
+                    );
+                } else {
+                    $currentWelcome.find("h2").text("My Digital Self");
+
+                    $currentWelcome.find("p").text(
+                        "Chat with your digital self using your approved memories " +
+                        "to help answer questions and evaluate decisions."
+                    );
+
+                    $input.attr(
+                        "placeholder",
+                        "Talk to your Digital Self..."
+                    );
+                }
+            }
+
+            loadConversationHistory(mode);
+            scrollToBottom();
+        }
+
+        $tabs.on("click", function () {
+            switchMode($(this).data("mode"));
+        });
+
+        // Logout
+        $logoutForm.on("submit", async function (event) {
+            event.preventDefault();
+
+            const $button = $logoutForm.find('button[type="submit"]');
+
+            $button.prop("disabled", true);
+            $logoutError.prop("hidden", true);
+
+            try {
+                const csrfHeaders = await getCsrfHeaders();
+
+                const response = await ajaxRequest({
+                    url: "/logout",
+                    method: "POST",
+                    headers: $.extend({
+                        "Accept": "application/json",
+                        "X-Requested-With": "XMLHttpRequest"
+                    }, csrfHeaders)
+                });
+
+                const data = response.data;
+
+                window.location.assign(
+                    data.redirect || "/login?logout"
+                );
+            } catch (error) {
+                console.error("Logout failed:", error);
+
+                $logoutError
+                    .text(error.message || "Logout failed. Please try again.")
+                    .prop("hidden", false);
+
+                $button.prop("disabled", false);
+            }
+        });
+
+        // Initialize the application
+        switchMode("digital_self");
+        refreshOllamaStatus();
+
+        window.setInterval(refreshOllamaStatus, 30000);
+    });
+</script>
+</body>
+</html>
